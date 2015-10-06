@@ -1,0 +1,122 @@
+import pythoncom, pyHook, win32gui, win32api, win32con, win32com.client, time
+from SendKeys import SendKeys
+
+class handler:
+
+    exitFlag = 0
+    flagStateRecord = 0
+    recordedQueue = []
+    shell = win32com.client.Dispatch("WScript.Shell")
+    startTime = 0
+    endTime = 0
+
+    def __init__(self, end=0):
+        self.endTime = end
+
+    """
+    def getMouseLocation(): 
+        flags, hcursor, (x,y) = win32gui.GetCursorInfo()
+        return flags, hcursor, (x,y)
+        """
+    def startTime(self):
+        self.startTime = time.clock()
+
+    def getTimePassed(self):
+        self.endTime = time.clock()-self.startTime
+
+    def leftClickDown(self,x,y):
+        win32api.SetCursorPos((x,y))
+        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN,x,y,0,0)
+
+    def leftClickUp(self,x,y):
+        win32api.SetCursorPos((x,y))
+        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP,x,y,0,0)
+
+    def rightClickDown(self,x,y):
+        win32api.SetCursorPos((x,y))
+        win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN,x,y,0,0)
+
+    def rightClickUp(self,x,y):
+        win32api.SetCursorPos((x,y))
+        win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP,x,y,0,0)
+
+    def pushkey(self,key):
+        try:
+            SendKeys(key)
+        except:
+            print(key)
+        #shell.SendKeys("{"+key+"}")
+
+    def playback(self):
+        for each in self.recordedQueue:
+            if each[0] == 'k':
+                self.pushkey(each[1])
+                time.sleep(each[2])
+            elif:
+                each[0] == 'm':
+                if each[1][0] == 'ld':
+                    self.leftClickDown(each[1][1],each[1][2])     
+                    time.sleep(each[2])    
+                elif each[1][0] == 'lu':
+                    self.leftClickUp(each[1][1],each[1][2])
+                    time.sleep(each[2])
+                elif each[1][0] == 'rd':
+                    self.rightClickDown(each[1][1],each[1][2])
+                    time.sleep(each[2])
+                elif each[1][0] == 'ru':
+                    self.rightClickUp(each[1][1],each[1][2])
+                    time.sleep(each[2])
+
+    def RaiseFlagRecord(self):
+        if self.flagStateRecord == 0:
+            self.flagStateRecord = 1
+        else:
+            self.flagStateRecord = 0
+
+    def addToQueue(self,item):
+        self.recordedQueue.append(item)
+
+    def OnKeyboardEvent(self,event):
+        if event.Ascii == 27:
+            self.exitFlag = 1
+            self.ender()
+
+        elif event.Ascii == 3:
+            self.RaiseFlagRecord()  #1 means start recording, 0 means stop recording
+            self.startTime()
+        
+        else:
+            if self.flagStateRecord == 1:
+                self.addToQueue(("k", event.Key, self.getTimePassed()))
+                self.startTime()
+
+        print('Ascii:', repr(event.Ascii), repr(chr(event.Ascii)))
+        return True
+
+    def OnMouseEvent(self,event):
+        (x,y) = event.Position
+        if event.Message == 513:
+            self.addToQueue(("m", ("ld",x,y), self.getTimePassed()))
+            self.startTime()
+        elif event.Message == 514:
+            self.addToQueue(("m", ("lu",x,y), self.getTimePassed()))
+            self.startTime()
+        elif event.Message == 516:
+            self.addToQueue(("m", ("rd",x,y), self.getTimePassed()))
+            self.startTime()
+        elif event.Message == 517:
+            self.addToQueue(("m", ("ru",x,y), self.getTimePassed()))
+            self.startTime()
+        return True
+
+
+if __name__=="__main__":
+    h = handler()
+    hm = pyHook.HookManager()
+    hm.KeyDown = h.OnKeyboardEvent
+    hm.MouseAll = OnMouseEvent
+    hm.HookKeyboard()
+    
+    while h.exitFlag == 0:
+        #if raiseFlagRecord()
+        pythoncom.PumpWaitingMessages()
