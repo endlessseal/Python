@@ -1,0 +1,130 @@
+import socket
+import time
+import requests
+import json
+import re
+import pickle
+
+URL = "irc.twitch.tv"
+USERNAME = "" #User name of twitch account
+PORT = 6667
+PASSWORD = "" #add own password here 
+rBuffer = ""
+CHANNEL = "" #what channel you would like it to be in
+MODT = False
+RATE = 20/30
+MODURLGETTER = "http://tmi.twitch.tv/group/user/" + CHANNEL[1:] + "/chatters"
+
+sock = socket.socket()
+sock.connect((URL, PORT))
+sock.send(("PASS " + PASSWORD + "\r\n").encode())
+sock.send(("NICK " + USERNAME + "\r\n").encode())
+sock.send(("JOIN " + CHANNEL + "\r\n").encode())
+
+
+mods = []
+commands = {}
+
+def send_msg(msg):
+	sock.send(("PRIVMSG " + CHANNEL + " : " + msg + "\r\n").encode())
+
+def loadMods():
+	loadMe = requests.get(MODURLGETTER)
+	if loadMe.status_code == 200:
+		myJSON = json.loads(loadMe.text)
+		mods = myJSON["chatters"]["moderators"]
+	else:
+		print(loadMe.status_code)
+
+def ban(user):
+	send_msg(".ban " + user + "\r\n")
+
+def timeout(user):
+	send_msg(".timeout " + user + "600\r\n")
+
+def addCommand(key, value):
+	if not key in commands:
+		commands[key] = value
+		send_msg("Added successful: " + key)
+	else:
+		send_msg("Can't add something that is already there!")
+
+def editCommand(key, value):
+	if key in commands:
+		commands[key] = value
+		send_msg("Editted successful: " + key)
+	else:
+		send_msg("Can't alter something that isn't there!")
+
+def deleteCommand(key, value):
+	if key in commands:
+		del commands[key] 
+		send_msg("Remove successful: " + key)
+	else:
+		send_msg("Can't delete something that isn't there!")
+
+def listOfCommands():
+	send_msg("List of Commands:")
+	for each in commands.keys():
+		send_msg(each)
+
+def loadCommands():
+	commands = pickle.load(open("commands.p","rb"))
+
+def saveCommands():
+	pickle.dump(commands, open("commands.p","wb"))
+
+
+try:
+	loadCommands()
+except:
+	print("No file found")
+
+stop = 1
+while stop == 1:
+	rBuffer = rBuffer + sock.recv(1024).decode()
+	temp = rBuffer.split("\n")
+	rBuffer = temp.pop()
+
+	for line in temp:
+		if (line[0] == "PING"):
+			sock.send("PONG %s\r\n" % line[1])
+		else:
+
+			parts = line.split(":")
+
+			if "QUIT" not in parts[1] and "JOIN" not in parts[1] and "PART" not in parts[1]:
+
+				msg = parts[2]
+				splitUserName = parts[1].split("!")
+				username = splitUserName[0]
+
+				if MODT:
+					if "!botStop" in msg and username == CHANNEL[1:]:
+						stop = 0
+
+					elif "!listCommands" in msg and username == CHANNEL[1:]:
+						listOfCommands()
+
+					elif "!addCommand" in msg and username == CHANNEL[1:]:
+						temp = re.sub("!addCommand ","",msg,count=1)
+						addCommand(temp.split(' ', 1)[0],temp.split(' ',1)[1])
+
+					elif "!editCommand" in msg and username == CHANNEL[1:]:
+						temp = re.sub("!editCommand ","",msg,count=1)
+						editCommand(temp.split(' ', 1)[0],temp.split(' ',1)[1])
+
+					elif "!deleteCommand" in msg and username == CHANNEL[1:]:
+						temp = re.sub("!deleteCommand ","",msg,count=1)
+						deleteCommand(temp.split(' ', 1)[0])
+
+					elif "!test" in msg and username == CHANNEL[1:]:
+						print("hello")
+
+				for x in parts:
+					if "End of /NAMES list" in x:
+						MODT = True
+
+	time.sleep(1 / RATE)
+saveCommands()
+
