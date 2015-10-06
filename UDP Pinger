@@ -1,0 +1,15 @@
+import socket
+import sys
+import time
+
+HOST, PORT = "localhost", 8888
+MESS = " ".join(sys.argv[1:])
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+start = time.time()
+sock.sendto(bytes(MESS + ' ' + str(pings) + "\n", "utf-8"), (HOST, PORT))
+
+received = str(sock.recv(1024), "utf-8")
+end = time.time() - start
+print("Received: {}".format(received))
+print(end)
